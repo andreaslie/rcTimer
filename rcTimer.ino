@@ -1,9 +1,13 @@
-/**
- * 
- */
 
 #include <LiquidCrystal.h>
 
+const char * versionNumber = "v0.2";
+
+// the best lap & race times since reset of device
+volatile unsigned long alltimeBestLap     = 0;
+volatile unsigned long alltimeBestRace    = 0;
+
+// the current race variables
 volatile unsigned long msStartTime        = 0;
 volatile unsigned long msLastLapTime      = 0;
 volatile unsigned long msLastStartTime    = 0;
@@ -12,44 +16,95 @@ volatile unsigned long msBestLapTime      = 0;
 volatile unsigned int lapCounterNo        = 0;
 volatile unsigned int bestLapNo           = 0;
 
+// button variables
 volatile unsigned long msLastButtonPush = 0;
+volatile unsigned long msLastButtonHold = 0;
+volatile bool isButtonUp                = true;
+const unsigned int resetCriteria        = 3000;
 
+// buffer for laptimes in current race
 unsigned long lapTimes[100];
 
-const int lapFinishSensorPin = 2;
-const int togglePin = 3;
+// pins
+const int lapFinishSensorPin  = 2;
+const int togglePin           = 3;
+const int ledPin              = 5;
+
+// sleep constants
 const unsigned int interruptSleep = 200;
-const unsigned int finishSleep = 5000;
+const unsigned int finishSleep    = 5000;
 
-volatile unsigned int totalRaceLaps = 3;
-volatile int currentLapIndex = -1;
+// race lap counters
+volatile int totalRaceLaps    = 3;
+volatile int currentLapIndex  = -3;
 
-bool raceStarted = false;
-bool raceFinishing = false;
-bool raceEnded = false;
+// race states
+bool raceStarted    = false;
+bool raceFinishing  = false;
+bool raceEnded      = false;
 
 LiquidCrystal lcd(7, 8, 9, 10, 11 , 12);
 
-void setup() {
+/**
+ * Init function
+ */
+void setup()
+{
     Serial.begin(9600);      // open the serial port at 9600 bps
-    
+
+    // activate pins
     pinMode(lapFinishSensorPin, INPUT_PULLUP);
     pinMode(togglePin, INPUT_PULLUP);
-    
+    pinMode(ledPin, OUTPUT);
+
+    // attach interrupts
     attachInterrupt(0, isrLapTimer, FALLING);
-    attachInterrupt(1, togglePinActivated, FALLING);
-    
+    attachInterrupt(1, togglePinActivated, RISING);
+
+    // start display
     lcd.begin(16, 2);
-    printInfoOnLcd();
-  
-    Serial.println("RC Timer v0.1");
+
+    resetSystem();
 }
 
-void loop()
+/**
+ * Function for resetting the system
+ */
+void resetSystem()
 {
+    lcd.clear();
+    
+    raceStarted    = false;
+    raceFinishing  = false;
+    raceEnded      = false;
+    isButtonUp     = false;
+    
+    msStartTime       = 0;
+    msLastLapTime     = 0;
+    msLastStartTime   = 0;
+    msCurrentTime     = 0;
+    msBestLapTime     = 0;
+    lapCounterNo      = 0;
+    bestLapNo         = 0;
+    totalRaceLaps     = 3;
+    currentLapIndex   = -3;
+    
+    printInfoOnLcd();  
+}
+
+/**
+ * The System Loop
+ */
+void loop()
+{ 
+    // sleep a bit
+    delay(200);
+    
+    volatile unsigned long now = millis();
+    
+    // update the lcd display
     if (raceFinishing)
     {
-        volatile unsigned long now = millis();
         if ((msLastStartTime + finishSleep) <= now)
         {
             writeRaceTotals();
@@ -58,17 +113,35 @@ void loop()
         }
     }
     
-    // update the lcd display
     if (lapCounterNo > 1 && !raceEnded)
     {
         writeLaptimeLcd(0, lapCounterNo-1, msLastLapTime);
-        writeLaptimeLcd(1, bestLapNo, msBestLapTime);
+
+        if (!raceFinishing)
+            writeLaptimeLcd(1, bestLapNo, msBestLapTime);
+        else
+        {
+            lcd.setCursor(0,1);
+            lcd.print("RACE ENDED      ");
+        }
     }
-   
-    // sleep a bit
-    delay(200);
+    
+    // check for reset criteria
+    if (isButtonUp)
+    {
+        if ((msLastButtonHold + resetCriteria) <= now)
+        {
+            Serial.println("RESET");
+            msLastButtonHold = now;
+            msLastButtonPush = now;
+            resetSystem();
+        }
+    }
 }
 
+/**
+ * Function for writing the Race Total Time and Best Lap
+ */
 void writeRaceTotals()
 {
     lcd.clear();
@@ -82,7 +155,81 @@ void writeRaceTotals()
 }
 
 /**
- * 
+ * Function for writing the AllTimeTotals (since last reset..)
+ */
+void writeAllTimeTotals()
+{
+    lcd.clear();
+    lcd.setCursor(0,0);
+    int position = 0;
+    position += lcd.print("αTIME: ");
+    writeLap(alltimeBestRace, 0);
+    lcd.setCursor(0,1);
+    position += lcd.print("αLAP: ");
+    writeLap(alltimeBestLap, 1);
+}
+
+/**
+ * Helper function for determining alltime lap record
+ */
+bool checkForLapRecord()
+{
+    // is it a new lap record?
+    if (alltimeBestLap == 0)
+    {
+        alltimeBestLap = msLastLapTime;
+        return true;
+    }
+    else if (alltimeBestLap > msLastLapTime)
+    {
+        alltimeBestLap = msLastLapTime;
+        soundAllTimeLapRecord();
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Helper function for determining alltime race record
+ */
+void checkForRaceRecord()
+{
+    if (alltimeBestRace = 0)
+        alltimeBestRace = msCurrentTime;
+    else if (alltimeBestRace > msCurrentTime)
+    {
+        alltimeBestRace = msCurrentTime;
+        soundAllTimeRaceRecord();
+    }
+}
+
+/**
+ * Function for sounding a new best Alltime Lap
+ */
+void soundAllTimeLapRecord()
+{
+ 
+}
+
+/**
+ * Function for sounding a lap record
+ */
+void soundLapRecord()
+{
+  
+}
+
+/**
+ * Function for sounding a new AllTime Race Record
+ */
+void soundAllTimeRaceRecord()
+{
+  
+}
+
+/**
+ * Function for writing lap time at specified column
  */
 void writeLap(unsigned int lapTime, unsigned int column)
 {
@@ -118,6 +265,9 @@ void writeLap(unsigned int lapTime, unsigned int column)
     position += lcd.print(milliseconds);
 }
 
+/**
+ * 
+ */
 void writeRaceLapOnLcd(unsigned int column, unsigned int index)
 {
     int position = 0;
@@ -131,6 +281,9 @@ void writeRaceLapOnLcd(unsigned int column, unsigned int index)
     writeLap(lapTimes[index], column);
 }
 
+/**
+ * Update the Current & Best laptime on the display
+ */
 void writeLaptimeLcd(unsigned int column, unsigned int lapCount, unsigned long lapTime)
 {
     volatile int position = 0;
@@ -148,10 +301,15 @@ void writeLaptimeLcd(unsigned int column, unsigned int lapCount, unsigned long l
     writeLap(lapTime, column);
 }
 
+/**
+ * 
+ */
 void printInfoOnLcd()
 {
     lcd.setCursor(0,0);
-    lcd.write("RC Timer v0.1");
+    lcd.write("RC Timer ");
+    lcd.setCursor(9,0);
+    lcd.write(versionNumber);
     lcd.setCursor(0,1);
     int position = 0;
     position += lcd.print("LAPS: ");
@@ -159,11 +317,22 @@ void printInfoOnLcd()
     lcd.print(totalRaceLaps);
 }
 
+/**
+ * Interrupt service routine for Pushbutton
+ */
 void togglePinActivated()
 {
     volatile unsigned long now = millis();
+
+    // fix the reset bouncing
+
+   // isButtonUp = digitalRead(togglePin);
+
+    if (isButtonUp)
+        msLastButtonHold = now;
+
     if ((msLastButtonPush + interruptSleep) <= now)
-    {
+    {    
         msLastButtonPush = now;
       
         if (!raceStarted)
@@ -178,10 +347,16 @@ void togglePinActivated()
             currentLapIndex += 2;
             lcd.clear();
 
+            Serial.println(currentLapIndex);
+
             if (currentLapIndex > totalRaceLaps) // allow cycling of laps
             {
-                currentLapIndex = -1;
+                currentLapIndex = -3;
                 writeRaceTotals();
+            }
+            else if(currentLapIndex < 0)
+            {
+                writeAllTimeTotals();
             }
             else
             {
@@ -196,7 +371,7 @@ void togglePinActivated()
 }
 
 /**
- * 
+ * Interrupt service routine for Lap Timer
  */
 void isrLapTimer()
 {
@@ -215,15 +390,17 @@ void isrLapTimer()
         raceStarted = true;
 
         lcd.setCursor(0,0);
-        lcd.print("RACE ON");
+        lcd.print("RACE STARTED");
         
         // begin next lap
         lapCounterNo++;
+
+        blinkLedLight();
     }
     else if ((msLastStartTime + interruptSleep) <= now)
     {
         if (!raceEnded && !raceFinishing)
-        {
+        {       
             // update last measurement made
             msLastLapTime = now - msLastStartTime;
             msLastStartTime = now;
@@ -234,6 +411,11 @@ void isrLapTimer()
             // best lap?
             if (bestLapNo == 0 || msBestLapTime > msLastLapTime)
             {
+                bool wasAlltimeLapRecord = checkForLapRecord();
+                
+                if (bestLapNo != 0 && !wasAlltimeLapRecord)
+                    soundLapRecord();
+              
                 msBestLapTime = msLastLapTime;
                 bestLapNo = lapCounterNo;
             }
@@ -248,8 +430,22 @@ void isrLapTimer()
 
                 // calculate race time
                 msCurrentTime = now - msStartTime;
+
+                checkForRaceRecord();
             }
         }
+
+        blinkLedLight();
     }
+}
+
+/**
+ * Turn the led on and off again
+ */
+void blinkLedLight()
+{
+    digitalWrite(ledPin, HIGH);
+    delay(100);
+    digitalWrite(ledPin, LOW);
 }
 
