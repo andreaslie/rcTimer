@@ -34,6 +34,7 @@ const int lapFinishSensorPin  = 2;
 const int buttonPin           = 3;
 const int ledPin              = 5;
 const int resetPin            = 13;
+const int soundPin            = 6;
 
 // sleep constants
 const unsigned int interruptSleep = 200;
@@ -241,6 +242,7 @@ void isrLapTimer()
         lapCounterNo++;
 
         blinkLedLight();
+        soundLapCompleted();
     }
     else if ((msLastStartTime + interruptSleep) <= now)
     {
@@ -276,10 +278,14 @@ void isrLapTimer()
                 // calculate race time
                 msCurrentTime = now - msStartTime;
 
+                soundRaceFinished();
                 checkForRaceRecord();
             }
         }
 
+        if (!raceFinishing)
+            soundLapCompleted();
+            
         blinkLedLight();
     }
 }
