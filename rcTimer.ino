@@ -1,14 +1,13 @@
 /**
   *  TODO: 
   *  remove blink delay
-  *  add sounds for speaker/buzzer
   *  add different blink signals
   *
   */
 
 #include <LiquidCrystal.h>
 
-const char * versionNumber = "v0.2";
+const char * versionNumber = "v0.3";
 
 // the best lap & race times since reset of device
 volatile unsigned long alltimeBestLap     = 0;
@@ -48,6 +47,13 @@ volatile int currentLapIndex  = -3;
 bool raceStarted    = false;
 bool raceFinishing  = false;
 bool raceEnded      = false;
+
+// sound states
+bool allTimeLap     = false;
+bool allTimeRace    = false;
+bool bestLap        = false;
+bool completedRace  = false;
+bool completedLap   = false; // don't indicate on start
 
 LiquidCrystal lcd(7, 8, 9, 10, 11 , 12);
 
@@ -95,7 +101,17 @@ void resetSystem()
     totalRaceLaps     = 3;
     currentLapIndex   = -3;
     
-    writeInfoOnDisplay();  
+    writeInfoOnDisplay();
+
+    allTimeLap     = false;
+    allTimeRace    = false;
+    bestLap        = false;
+    completedRace  = false;
+    completedLap   = false; // don't indicate on start
+
+    delay(500);
+
+    readyForRace();
 }
 
 /**
@@ -132,6 +148,33 @@ void loop()
             lcd.print("RACE END");
         }
     }
+
+    // play sounds accordingly
+    if  (allTimeRace)
+    {
+        soundAllTimeRaceRecord();
+        allTimeRace = false;
+    }
+    else if (allTimeLap)
+    {
+        soundAllTimeLapRecord();
+        allTimeLap = false;
+    }
+    else if (completedRace)
+    {
+        soundRaceFinished();
+        completedRace = false;
+    }
+    else if (bestLap)
+    {
+        soundLapRecord();
+        bestLap = false;
+    }
+    else if (completedLap)
+    {
+        soundLapCompleted();
+        completedLap = false;
+    }
     
     if (!digitalRead(resetPin))
         resetSystem();
@@ -151,7 +194,6 @@ bool checkForLapRecord()
     else if (alltimeBestLap > msLastLapTime)
     {
         alltimeBestLap = msLastLapTime;
-        soundAllTimeLapRecord();
         return true;
     }
 
@@ -161,15 +203,20 @@ bool checkForLapRecord()
 /**
  * Helper function for determining alltime race record
  */
-void checkForRaceRecord()
+bool checkForRaceRecord()
 {
     if (alltimeBestRace == 0)
+    {
         alltimeBestRace = msCurrentTime;
+        return false; // dont indicate since this is the first record ever
+    }
     else if (alltimeBestRace > msCurrentTime)
     {
         alltimeBestRace = msCurrentTime;
-        soundAllTimeRaceRecord();
+        return true;
     }
+
+    return false;
 }
 
 /**
@@ -223,6 +270,12 @@ void isrLapTimer()
 {
     volatile unsigned long now = millis();
 
+    allTimeLap     = false;
+    allTimeRace    = false;
+    bestLap        = false;
+    completedRace  = false;
+    completedLap   = false; // don't indicate on start
+
     // start of laps?
     if (!raceStarted)
     {
@@ -240,9 +293,6 @@ void isrLapTimer()
         
         // begin next lap
         lapCounterNo++;
-
-        blinkLedLight();
-        soundLapCompleted();
     }
     else if ((msLastStartTime + interruptSleep) <= now)
     {
@@ -258,10 +308,10 @@ void isrLapTimer()
             // best lap?
             if (bestLapNo == 0 || msBestLapTime > msLastLapTime)
             {
-                bool wasAlltimeLapRecord = checkForLapRecord();
+                allTimeLap = checkForLapRecord();
                 
-                if (bestLapNo != 0 && !wasAlltimeLapRecord)
-                    soundLapRecord();
+                if (bestLapNo != 0 && !allTimeLap)
+                    bestLap = true;
               
                 msBestLapTime = msLastLapTime;
                 bestLapNo = lapCounterNo;
@@ -278,13 +328,13 @@ void isrLapTimer()
                 // calculate race time
                 msCurrentTime = now - msStartTime;
 
-                soundRaceFinished();
-                checkForRaceRecord();
+                completedRace = true;
+                allTimeRace = checkForRaceRecord();
             }
         }
 
         if (!raceFinishing)
-            soundLapCompleted();
+            completedLap = true;
             
         blinkLedLight();
     }
