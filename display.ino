@@ -126,3 +126,14 @@ void blinkLedLight()
     delay(100);
     digitalWrite(ledPin, LOW);
 }
+
+/**
+ * Prints an error message when laser is not correctly calibrated
+ */
+void writeLaserErrorMessage()
+{
+    lcd.setCursor(0,0);
+    lcd.write("--LASER FAULTY--");
+    lcd.setCursor(0,1);
+    lcd.write("--RESET SYSTEM--");
+}

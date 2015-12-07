@@ -1,13 +1,7 @@
-/**
-  *  TODO: 
-  *  remove blink delay
-  *  add different blink signals
-  *
-  */
 
 #include <LiquidCrystal.h>
 
-const char * versionNumber = "v0.3";
+const char * versionNumber = "v0.4";
 
 // the best lap & race times since reset of device
 volatile unsigned long alltimeBestLap     = 0;
@@ -47,6 +41,7 @@ volatile int currentLapIndex  = -3;
 bool raceStarted    = false;
 bool raceFinishing  = false;
 bool raceEnded      = false;
+bool invalidSystem  = false;
 
 // sound states
 bool allTimeLap     = false;
@@ -55,7 +50,7 @@ bool bestLap        = false;
 bool completedRace  = false;
 bool completedLap   = false; // don't indicate on start
 
-LiquidCrystal lcd(7, 8, 9, 10, 11 , 12);
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 
 /**
  * Init function
@@ -87,6 +82,7 @@ void resetSystem()
 {
     lcd.clear();
     
+    invalidSystem  = false;
     raceStarted    = false;
     raceFinishing  = false;
     raceEnded      = false;
@@ -109,9 +105,17 @@ void resetSystem()
     completedRace  = false;
     completedLap   = false; // don't indicate on start
 
-    delay(500);
-
-    readyForRace();
+    // detect issue with laser calibration, dont start until correctly positioned
+    if (digitalRead(lapFinishSensorPin) != HIGH)
+    {
+        invalidSystem = true;
+        writeLaserErrorMessage();
+    }
+    else
+    {
+        delay(500);
+        readyForRace();
+    }
 }
 
 /**
@@ -120,7 +124,7 @@ void resetSystem()
 void loop()
 { 
     // sleep a bit
-    delay(200);
+    delay(50);
     
     volatile unsigned long now = millis();
     
@@ -134,7 +138,6 @@ void loop()
             raceEnded = true;
         }
     }
-    
     
     if (lapCounterNo > 1 && !raceEnded)
     {    
@@ -152,28 +155,24 @@ void loop()
     // play sounds accordingly
     if  (allTimeRace)
     {
+        allTimeRace   = false;
+        completedLap  = false;
+        completedRace = false;
         soundAllTimeRaceRecord();
-        allTimeRace = false;
-    }
-    else if (allTimeLap)
-    {
-        soundAllTimeLapRecord();
-        allTimeLap = false;
     }
     else if (completedRace)
     {
-        soundRaceFinished();
+        allTimeRace   = false;
         completedRace = false;
+        completedLap  = false;
+        soundRaceFinished();
     }
-    else if (bestLap)
+    else if (completedLap || bestLap || allTimeLap)
     {
-        soundLapRecord();
-        bestLap = false;
-    }
-    else if (completedLap)
-    {
-        soundLapCompleted();
         completedLap = false;
+        bestLap      = false;
+        allTimeLap   = false;
+        soundLapCompleted();
     }
     
     if (!digitalRead(resetPin))
@@ -224,6 +223,10 @@ bool checkForRaceRecord()
  */
 void buttonPinActivated()
 {
+    // if laser was incorrectly positioned, we should not do anything ..
+    if (invalidSystem)
+        return;
+  
     volatile unsigned long now = millis();
 
     if ((msLastButtonPush + interruptSleep) <= now)
@@ -268,6 +271,10 @@ void buttonPinActivated()
  */
 void isrLapTimer()
 {
+    // if laser was incorrectly positioned, we should not do anything ..
+    if (invalidSystem)
+        return;
+        
     volatile unsigned long now = millis();
 
     allTimeLap     = false;
@@ -293,6 +300,9 @@ void isrLapTimer()
         
         // begin next lap
         lapCounterNo++;
+        
+        blinkLedLight();
+        completedLap = true;
     }
     else if ((msLastStartTime + interruptSleep) <= now)
     {
@@ -331,12 +341,10 @@ void isrLapTimer()
                 completedRace = true;
                 allTimeRace = checkForRaceRecord();
             }
-        }
-
-        if (!raceFinishing)
+            
             completedLap = true;
+        }
             
         blinkLedLight();
     }
 }
-

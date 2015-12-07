@@ -3,11 +3,14 @@
  */
 void soundAllTimeLapRecord()
 {
+    // currently no sound
+    /*
     tone(soundPin, 1319, 250);
     delay(350);
     tone(soundPin, 1319, 250);
     delay(350);
     tone(soundPin, 1319, 250);
+    */
 }
 
 /**
@@ -15,7 +18,10 @@ void soundAllTimeLapRecord()
  */
 void soundLapRecord()
 {
+    // currently no sound
+    /*
     tone(soundPin, 1319, 200);
+    */
 }
 
 /**
@@ -29,10 +35,11 @@ void soundAllTimeRaceRecord()
     delay(250);tone(soundPin,510,100);
     delay(150);tone(soundPin,660,100);
     delay(250);tone(soundPin,770,100);
-    
+  
+    /*    
     delay(375);tone(soundPin,380,100);
     delay(387);tone(soundPin,510,100);
-    delay(325);tone(soundPin,380,100);
+    delay(325);tone(soundPin,380,100);    
     delay(300);tone(soundPin,320,100);
     delay(350);tone(soundPin,440,100);
     delay(230);tone(soundPin,480,80);
@@ -68,6 +75,7 @@ void soundAllTimeRaceRecord()
     delay(230);tone(soundPin,520,80);
     delay(155);tone(soundPin,580,80);
     delay(155);tone(soundPin,480,80);
+    */
 }
 
 /**
@@ -75,8 +83,13 @@ void soundAllTimeRaceRecord()
  */
 void soundRaceFinished()
 {
-    // okay
-    tone(soundPin, 698, 500);
+    tone(soundPin, 1050, 100);
+    delay(150);    
+    tone(soundPin, 1050, 100);
+    delay(150);
+    tone(soundPin, 1050, 100);
+    delay(150);
+    tone(soundPin, 1050, 300);
 }
 
 /**
@@ -84,7 +97,7 @@ void soundRaceFinished()
  */
 void soundLapCompleted()
 { 
-    // currently no sound
+    tone(soundPin, 1050, 100);
 }
 
 /**
