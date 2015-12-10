@@ -101,6 +101,14 @@ void soundLapCompleted()
 }
 
 /**
+ * Sound last lap
+ */
+void soundLastLap()
+{
+    tone(soundPin, 1050, 300);
+}
+
+/**
  * Sound beeps when race is about to start
  */
 void readyForRace()

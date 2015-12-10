@@ -31,7 +31,7 @@ void writeAllTimeTotals()
 /**
  * Function for writing lap time at specified column
  */
-void writeLap(unsigned int lapTime, unsigned int column)
+void writeLap(unsigned long lapTime, unsigned int column)
 {
     int position = 10; // always start time at this position
     lcd.setCursor(position, column);

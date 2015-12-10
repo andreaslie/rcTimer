@@ -1,7 +1,7 @@
 
 #include <LiquidCrystal.h>
 
-const char * versionNumber = "v0.4";
+const char * versionNumber = "v0.5";
 
 // the best lap & race times since reset of device
 volatile unsigned long alltimeBestLap     = 0;
@@ -47,6 +47,7 @@ bool invalidSystem  = false;
 bool allTimeLap     = false;
 bool allTimeRace    = false;
 bool bestLap        = false;
+bool lastLap        = false;
 bool completedRace  = false;
 bool completedLap   = false; // don't indicate on start
 
@@ -94,7 +95,9 @@ void resetSystem()
     msBestLapTime     = 0;
     lapCounterNo      = 0;
     bestLapNo         = 0;
-    totalRaceLaps     = 3;
+
+    // increments by two. used when showing race info.
+    // e.g. first show race totals, then alltime totals, then individual laps
     currentLapIndex   = -3;
     
     writeInfoOnDisplay();
@@ -102,6 +105,7 @@ void resetSystem()
     allTimeLap     = false;
     allTimeRace    = false;
     bestLap        = false;
+    lastLap        = false;
     completedRace  = false;
     completedLap   = false; // don't indicate on start
 
@@ -167,12 +171,18 @@ void loop()
         completedLap  = false;
         soundRaceFinished();
     }
-    else if (completedLap || bestLap || allTimeLap)
+    else if (completedLap || bestLap || allTimeLap || lastLap)
     {
         completedLap = false;
         bestLap      = false;
         allTimeLap   = false;
-        soundLapCompleted();
+
+        if (lastLap)
+            soundLastLap();
+        else
+            soundLapCompleted();
+
+        lastLap = false;
     }
     
     if (!digitalRead(resetPin))
@@ -343,6 +353,9 @@ void isrLapTimer()
             }
             
             completedLap = true;
+
+            if (lapCounterNo == totalRaceLaps)
+                lastLap = true;
         }
             
         blinkLedLight();
